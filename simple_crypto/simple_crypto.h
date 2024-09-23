@@ -1,7 +1,7 @@
 #ifndef _SIMPLE_CRYPTO_H_
 #define _SIMPLE_CRYPTO_H_
 
-#define MAX_MSG_LEN 256
+#define MAX_LEN 256
 
 void cryptoStart();
 void generateSubstitutionKey(char key, char *substitution);

@@ -1,7 +1,7 @@
 #include <stdio.h>
-#include <ctype.h>
-#include <string.h>
-#include "cmake-build-debug/simple_crypto.h"
+//#include <ctype.h>
+//#include <string.h>
+#include "simple_crypto/simple_crypto.h"
 
 int main(void) {
     int choice;
@@ -29,9 +29,6 @@ int main(void) {
             printf("Invalid choice. Please try again.\n\n");
             break;
         }
-
-
-    }
-
+    } // End while loop
     return 0;
-}
+} // End main

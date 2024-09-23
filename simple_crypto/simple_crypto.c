@@ -7,9 +7,6 @@ void cryptoStart()
 {
     int choice;
     char key;
-    char inputFileName[MAX_MSG_LEN];
-    char outputFileName[MAX_MSG_LEN];
-    char substitution[26];
     int encrypt;
 
     do
@@ -24,8 +21,12 @@ void cryptoStart()
 
         if (choice == 1 || choice == 2)
         {
+            char inputFileName[MAX_LEN];
+            char outputFileName[MAX_LEN];
+            char substitution[26];
+
             printf("Enter key: ");
-            scanf(" %c", &key);
+            scanf("%c", &key);
 
             if (!isalpha(key))
             {
@@ -71,9 +72,9 @@ void cryptoStart()
             break;
         }
     } while (choice != 3);
-    return;
 }
 
+// Generate the substitution string based on user entered key.
 void generateSubstitutionKey(char key, char *substitution)
 {
     key = toupper(key);
@@ -85,6 +86,7 @@ void generateSubstitutionKey(char key, char *substitution)
     }
 }
 
+// Encrypt or decrypt the message.
 void processMessage(const char *substitution, const char *inputFileName, const char *outputFileName, int encrypt)
 {
     FILE *inputFile = fopen(inputFileName, "r");
