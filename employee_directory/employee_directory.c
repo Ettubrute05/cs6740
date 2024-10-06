@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <termios.h>
 #include "employee_directory.h"
+#include <errno.h>
+#include <sys/stat.h>
 
 void employeeDirectoryStart()
 {
@@ -39,7 +41,7 @@ void employeeDirectoryStart()
         case 3:
             return;
 
-        defaule:
+        default:
             printf("Invalid option. Please try again.\n");
         }
     } while (choice != 3);
@@ -48,9 +50,9 @@ void employeeDirectoryStart()
 // View the employee directory
 void viewDirectory()
 {
+    createFileIfNotExists(DIRECTORY_FILE);
     FILE *directoryFile = fopen(DIRECTORY_FILE, "r");
     char line[EMPLOYEE_RECORD_SIZE];
-    struct Employee emp;
 
     if (directoryFile == NULL)
     {
@@ -59,17 +61,56 @@ void viewDirectory()
     }
 
     printf("\n--- Employee Directory ---\n");
-    printf("%-20s %-20s %-20s %-10s %-15s", "Last Name", "First Name", "Position", "Emp ID", "Telephone");
-    printf("------------------------------------------------------------------------------------");
+    printf("%-20s %-20s %-20s %-10s %-15s\n", "Last Name", "First Name", "Position", "Emp ID", "Telephone");
+    printf("------------------------------------------------------------------------------------\n");
 
     // Loop through each line of the file
     while (fgets(line, sizeof(line), directoryFile))
     {
-        // Parse the comma-separated values into the Employee struct
-        sscanf(line, "%[^,],%[^,],%[^,],%d,%[^\n]", emp.lastName, emp.firstName, emp.position, emp.employeeID, emp.telephone);
+        struct Employee emp;
+        // Tokenize each part of the line using comma as delimiter
+        const char *token = strtok(line, ",");
 
-        // Print the data from the Employee struct in formatted columns
-        printf("%-20s %-20s %-20s %-10s %-15s\n", emp.lastName, emp.firstName, emp.position, emp.employeeID, emp.telephone);
+        // Extract the last name
+        if (token != NULL)
+        {
+            strncpy(emp.lastName, token, sizeof(emp.lastName) - 1);
+            emp.lastName[sizeof(emp.lastName) - 1] = '\0';
+        }
+
+        // Extract the first name
+        token = strtok(NULL, ",");
+        if (token != NULL)
+        {
+            strncpy(emp.firstName, token, sizeof(emp.firstName) - 1);
+            emp.firstName[sizeof(emp.firstName) - 1] = '\0';
+        }
+
+        // Extract the position
+        token = strtok(NULL, ",");
+        if (token != NULL)
+        {
+            strncpy(emp.position, token, sizeof(emp.position) - 1);
+            emp.position[sizeof(emp.position) - 1] = '\0';
+        }
+
+        // Extract the employee ID and convert it to an int
+        token = strtok(NULL, ",");
+        if (token != NULL)
+        {
+            emp.employeeID = strtol(token, NULL, 10);
+        }
+
+        // Extract the telephone number
+        token = strtok(NULL, ",");
+        if (token != NULL)
+        {
+            strncpy(emp.telephone, token, sizeof(emp.telephone) - 1);
+            emp.telephone[sizeof(emp.telephone) - 1] = '\0';
+        }
+
+        // Print the data into formatted columns
+        printf("%-20s %-20s %-20s %-10d %-15s\n", emp.lastName, emp.firstName, emp.position, emp.employeeID, emp.telephone);
     }
     fclose(directoryFile);
 }
@@ -134,7 +175,7 @@ int checkPassword()
         fclose(passwordFile);
     }
 
-    printf("Enter new password: ");
+    printf("Enter password: ");
     getPassword(enteredPassword, sizeof(enteredPassword));
 
     if (strcmp(storedPassword, enteredPassword) == 0)
@@ -147,28 +188,23 @@ int checkPassword()
 // Change the password
 void changePassword()
 {
-    const FILE *passwordFile = fopen(PASSWORD_FILE, "w");
 
-    if (passwordFile == NULL)
-    {
-        printf("Error: Unable to open password file.\n");
-        return;
-    }
 
-    while (1)
+    int passwordsMatch = 0;
+    char newPassword[50];
+    while (!passwordsMatch)
     {
-        char newPassword[50];
         char confirmPassword[50];
 
         printf("Enter new password: ");
         getPassword(newPassword, sizeof(newPassword));
 
-        printf("Reenter password to confirm: ");
+        printf("Reenter new password to confirm: ");
         getPassword(confirmPassword, sizeof(confirmPassword));
 
-        if (strcmp(newPassword, confirmPassword) == 1)
+        if (strcmp(newPassword, confirmPassword) == 0)
         {
-            break;
+            passwordsMatch = 1;
         }
         else
         {
@@ -176,17 +212,48 @@ void changePassword()
         }
     }
 
-    printf("Password changed successfully.\n");
+    // Temporarily change the file permissions to 600 to change the password
+    if (chmod(PASSWORD_FILE, 600) != 0)
+    {
+        printf("Error: Unable to set password file permissions to 600.\n");
+        return;
+    }
+
+    // Open the file
+    FILE *passwordFile = fopen(PASSWORD_FILE, "w");
+    if (passwordFile == NULL)
+    {
+        printf("Error: Unable to open password file.\n");
+        return;
+    }
+
+    // Write the new password to th file
+    fprintf(passwordFile, "%s", newPassword);
+    fclose(passwordFile);
+
+    if (chmod(PASSWORD_FILE, 0400) != 0)
+    {
+        printf("Error: Unable to set password file permissions to 400.\n");
+    }
+    else
+    {
+        printf("Password changed successfully.\n");
+    }
+
 }
 
 // Add a new employee
 void addEmployee()
 {
     struct Employee emp;
-    int verifyID = 0;
+    int isIDUnique = 0;
     struct Employee employees[MAX_EMPLOYEES];
-    int *employeeCount;
-    loadEmployees(employees, *employeeCount);
+    int employeeCount = 0;
+    if (!loadEmployees(employees, &employeeCount))
+    {
+        printf("Error loading employee directory.\n");
+        return;
+    }
     FILE *directoryFile = fopen(DIRECTORY_FILE, "a");
 
     if (directoryFile == NULL)
@@ -207,21 +274,39 @@ void addEmployee()
     fgets(emp.position, 50, stdin);
     emp.position[strcspn(emp.position, "\n")] ='\0';
 
-    do
+    while (!isIDUnique)
     {
-        int tempID;
+        char idInput[20];
+        char *endptr;
+
         printf("Enter employee ID: ");
-        scanf("%d", &tempID);
-        getchar(); // Consume newline
-        if (findEmployeeByID(employees, employeeCount, tempID) == -1)
+        //scanf("%d", emp.employeeID);
+        //getchar(); // Consume newline
+        fgets(idInput, sizeof(idInput), stdin);
+        idInput[strcspn(idInput, "\n")] = '\0';
+
+        errno = 0;
+        const long tempID = strtol(idInput, &endptr, 10);
+
+        // Checking for valid inputs
+        if (errno != 0 || *endptr != '\0' || tempID < 100000 || tempID > 999999)
         {
-            printf("Error: Employee ID already in use. Please try again.\n");
+            printf("Invalid Employee ID. Please enter a valid 6-digit number.\n");
+            continue;
+        }
+
+        emp.employeeID = (int)tempID;
+
+        // Check if the employee ID is already in use
+        if (findEmployeeByID(employees, employeeCount, emp.employeeID) != -1)
+        {
+            printf("Employee ID already in use. Please try again.\n");
         }
         else
         {
-            verifyID = 1;
+            isIDUnique = 1;
         }
-    } while (verifyID != 1);
+    }
 
     printf("Enter employee telephone number: ");
     fgets(emp.telephone, 15, stdin);
@@ -277,7 +362,6 @@ void editEmployee()
     struct Employee employees[MAX_EMPLOYEES];
     int employeeCount = 0;
     int employeeID;
-    int index;
 
     // Load employees from file
     if (!loadEmployees(employees, &employeeCount))
@@ -292,7 +376,7 @@ void editEmployee()
     getchar();
 
     // Find employee by ID
-    index = findEmployeeByID(employees, employeeCount, employeeID);
+    const int index = findEmployeeByID(employees, employeeCount, employeeID);
     if (index == -1)
     {
         printf("Employee with ID %d not found.\n", employeeID);
@@ -303,35 +387,40 @@ void editEmployee()
     int choice;
     do
     {
-        printf("Editing employee with ID %06d:\n", employeeID);
-        printf("1. Change last name (current: %s)\n", employees[index].lastName);
-        printf("2. Change first name (current %s)\n", employees[index].firstName);
-        printf("3. Change position (current: %s)\n", employees[index].position);
-        printf("4. Change telephone number (current: %s)\n", employees[index].telephone);
+        printf("\n--- Editing record for employee with ID %06d ---\n", employeeID);
+        printf("1. Change last name, current: %s\n", employees[index].lastName);
+        printf("2. Change first name, current %s\n", employees[index].firstName);
+        printf("3. Change position, current: %s\n", employees[index].position);
+        printf("4. Change telephone number, current: %s", employees[index].telephone);
         printf("5. Return to employee directory menu\n");
         printf("Choose an option: ");
         scanf("%d", &choice);
+        getchar();
 
         switch (choice)
         {
         case 1:
             printf("Enter new last name: ");
             fgets(employees[index].lastName, 50, stdin);
+            employees[index].lastName[strcspn(employees[index].lastName, "\n")] = '\0';
             break;
 
         case 2:
             printf("Enter new first name: ");
             fgets(employees[index].firstName, 50, stdin);
+            employees[index].firstName[strcspn(employees[index].firstName, "\n")] = '\0';
             break;
 
         case 3:
             printf("Enter new position: ");
             fgets(employees[index].position, 50, stdin);
+            employees[index].position[strcspn(employees[index].position, "\n")] = '\0';
             break;
 
         case 4:
             printf("Enter new telephone number: ");
             fgets(employees[index].telephone, 15, stdin);
+            employees[index].telephone[strcspn(employees[index].telephone, "\n")] = '\0';
             break;
 
         case 5:
@@ -340,7 +429,10 @@ void editEmployee()
         default:
             printf("Invalid option. Please try again.\n");
         }
-    } while (choice != 6);
+    } while (choice != 5);
+
+    // Save updated employees back to the file
+    saveEmployees(employees, employeeCount);
 
     printf("Employee record updated successfully.\n");
 }
@@ -389,11 +481,60 @@ int loadEmployees(struct Employee employees[], int *employeeCount)
         return 0;
     }
 
+    char line[EMPLOYEE_RECORD_SIZE];
     *employeeCount = 0;
-    while (fscanf(directoryFile, "%[^,],%[^,],%[^,],%d,%[^\n]\n", employees[*employeeCount].lastName,
-            employees[*employeeCount].firstName, employees[*employeeCount].position,
-            &employees[*employeeCount].employeeID, employees[*employeeCount].telephone) == 5)
+
+    // Loop through each line of the file
+    while (fgets(line, sizeof(line), directoryFile) != NULL)
     {
+        if (*employeeCount >= MAX_EMPLOYEES)
+        {
+            printf("Maximum employee count reached. Some employees may not be loaded.\n");
+            break;
+        }
+
+        // Tokenize the line
+        const char *token = strtok(line, ",");
+
+        // Extract the last name
+        if (token != NULL)
+        {
+            strncpy(employees[*employeeCount].lastName, token, sizeof(employees[*employeeCount].lastName) - 1);
+            employees[*employeeCount].lastName[sizeof(employees[*employeeCount].lastName) - 1] = '\0';
+        }
+
+        // Extract the first name
+        token = strtok(NULL, ",");
+        if (token != NULL)
+        {
+            strncpy(employees[*employeeCount].firstName, token, sizeof(employees[*employeeCount].firstName) - 1);
+            employees[*employeeCount].firstName[sizeof(employees[*employeeCount].firstName) - 1] = '\0';
+        }
+
+        // Extract the position
+        token = strtok(NULL, ",");
+        if (token != NULL)
+        {
+            strncpy(employees[*employeeCount].position, token, sizeof(employees[*employeeCount].position) - 1);
+            employees[*employeeCount].position[sizeof(employees[*employeeCount].position) - 1] = '\0';
+        }
+
+        // Extract the employee ID and convert it to an int
+        token = strtok(NULL, ",");
+        if (token != NULL)
+        {
+            employees[*employeeCount].employeeID = strtol(token, NULL, 10);
+        }
+
+        // Extract the telephone number
+        token = strtok(NULL, ",");
+        if (token != NULL)
+        {
+            strncpy(employees[*employeeCount].telephone, token, sizeof(employees[*employeeCount].telephone) - 1);
+            employees[*employeeCount].telephone[sizeof(employees[*employeeCount].telephone) - 1] = '\0';
+        }
+
+        // Increment employee count
         (*employeeCount)++;
     }
 
@@ -413,7 +554,7 @@ void saveEmployees(struct Employee employees[], int employeeCount)
 
     for (int i = 0; i < employeeCount; i++)
     {
-        fprintf(directoryFile, "%s,%s,%s,%06d,%s\n", employees[i].lastName,
+        fprintf(directoryFile, "%s,%s,%s,%06d,%s", employees[i].lastName,
                 employees[i].firstName, employees[i].position, employees[i].employeeID,
                 employees[i].telephone);
     }
@@ -421,7 +562,7 @@ void saveEmployees(struct Employee employees[], int employeeCount)
 }
 
 // Find index of employee by ID in the array
-int findEmployeeByID(struct Employee employees[], int employeeCount, int employeeID)
+int findEmployeeByID(struct Employee employees[], const int employeeCount, const int employeeID)
 {
     for (int i = 0; i < employeeCount; i++)
     {
@@ -431,4 +572,14 @@ int findEmployeeByID(struct Employee employees[], int employeeCount, int employe
         }
     }
     return -1;
+}
+
+// Create the file if it doesn't exist
+void createFileIfNotExists(const char *filename)
+{
+    FILE *fp = fopen(filename, "a");
+    if (fp != NULL)
+    {
+        fclose(fp);
+    }
 }

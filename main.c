@@ -9,7 +9,7 @@ int main(void) {
 
     while (1)
     {
-        printf("\n=== CS 6705 Main Menu ===\n");
+        printf("\n=== CS 6740 Main Menu ===\n");
         printf("1. Simple Crypto\n");
         printf("2. Employee Directory\n");
         printf("3. Exit\n");

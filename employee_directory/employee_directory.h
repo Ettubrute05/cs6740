@@ -28,5 +28,6 @@ void getPassword(char *password, size_t size);
 int loadEmployees(struct Employee employees[], int *employeeCount);
 void saveEmployees(struct Employee employees[], int employeeCount);
 int findEmployeeByID(struct Employee employees[], int employeeCount, int employeeID);
+void createFileIfNotExists(const char *filename);
 
 #endif
