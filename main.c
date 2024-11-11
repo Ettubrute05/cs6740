@@ -3,6 +3,7 @@
 //#include <string.h>
 #include "simple_crypto/simple_crypto.h"
 #include "employee_directory/employee_directory.h"
+#include "crypto_cracker/crypto_cracker.h"
 
 int main(void) {
     int choice;
@@ -12,7 +13,8 @@ int main(void) {
         printf("\n=== CS 6740 Main Menu ===\n");
         printf("1. Simple Crypto\n");
         printf("2. Employee Directory\n");
-        printf("3. Exit\n");
+        printf("3. Crypto Cracker\n");
+        printf("4. Exit\n");
         printf("Choose an option: ");
         scanf("%d", &choice);
         getchar();
@@ -28,6 +30,9 @@ int main(void) {
             break;
 
         case 3:
+            cryptoCrackerStart();
+
+        case 4:
             printf("Exiting...\n");
             return 0;
 

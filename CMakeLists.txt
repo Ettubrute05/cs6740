@@ -5,4 +5,5 @@ set(CMAKE_C_STANDARD 11)
 
 add_executable(cs6740 main.c
         simple_crypto/simple_crypto.c
-        employee_directory/employee_directory.c)
+        employee_directory/employee_directory.c
+        crypto_cracker/crypto_cracker.c)
