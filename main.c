@@ -31,6 +31,7 @@ int main(void) {
 
         case 3:
             cryptoCrackerStart();
+            break;
 
         case 4:
             printf("Exiting...\n");

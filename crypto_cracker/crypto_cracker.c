@@ -21,12 +21,14 @@ void cryptoCrackerStart()
         {
         case 1:
             cryptoCracker();
+            break;
 
         case 2:
             return;
 
         default:
             printf("Invalid option. Please try again.\n");
+            break;
         }
     }
 }
@@ -182,7 +184,7 @@ int detectVigenereCipher(const char *text)
         findVigenereKey(text, probableKeyLength, testKey);
         decryptVigenereCipher(text, testKey, decryptedText);
 
-        int length = strlen(decryptedText);
+        const int length = strlen(decryptedText);
         int vowelCount = 0;
         for (int i = 0; i < length; i++)
         {
@@ -290,13 +292,27 @@ void decryptColumnarCipher(const char *text, int keyLength, char *output)
     const int numRows = (textLength + keyLength - 1) / keyLength;
     char tempGrid[numRows][keyLength];
 
-    // Fill the grid with the text
-    for (int i = 0, k = 0; i < numRows; i++)
+    memset(tempGrid, 0, sizeof(tempGrid));
+
+    int index = 0;
+    for (int col = 0; col < keyLength && index < textLength; col++)
     {
-        for (int j = 0; j < keyLength && k < textLength; j++, k++)
+        for (int row = 0; row < numRows && index < textLength; row++)
         {
-            output[k] = tempGrid[i][j];
+            tempGrid[row][col] = text[index++];
         }
     }
-    output[textLength] = '\0';
+
+    index = 0;
+    for (int row = 0; row < numRows; row++)
+    {
+        for (int col = 0; col < keyLength; col++)
+        {
+            if (tempGrid[row][col] != 0)
+            {
+                output[index++] = tempGrid[row][col];
+            }
+        }
+    }
+    output[index] = '\0';
 }
